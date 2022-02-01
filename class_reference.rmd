@@ -39,7 +39,8 @@ library(tidyverse)
 
 arrange in ascending order = arrange().
 arrange in descending order = arrange(desc()).
-setting a variable = var <- code
+setting a variable = var <- code #preferable
+setting a variable = code -> var 
   ex:
   
 ```{r}
@@ -51,4 +52,11 @@ setting a variable = var <- code
   arrange(total_loans_amount)
   
 ```
+
+add/replace/change a column = mutate(column_name = value/object).
+value = number.
+value = 'word'.
+make all values in a column uppercase = str_to_upper(column_name).
+show me specific columns A, B, and C = select(column_A, column_B, column_C).
+
 
