@@ -35,3 +35,20 @@ install.packages("tidyverse")
 library(tidyverse)
 ```
 
+## Feb. 1
+
+arrange in ascending order = arrange().
+arrange in descending order = arrange(desc()).
+setting a variable = var <- code
+  ex:
+  
+```{r}
+  var <- ppp_maryland_loans %>%
+  summarise(
+    count_loans = n(),
+    total_loans_amount = sum(amount)
+  ) %>%
+  arrange(total_loans_amount)
+  
+```
+
