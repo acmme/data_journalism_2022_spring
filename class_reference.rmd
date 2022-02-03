@@ -30,7 +30,7 @@ Code block = ``` and then {r} and then ```.
 Load a library = library(#).
 
 ```{r}
-setwd("~/Github/data_journalism_2022_spring")
+setwd("~/GitHub/data_journalism_2022_spring")
 install.packages("tidyverse")
 library(tidyverse)
 ```
@@ -59,4 +59,32 @@ value = 'word'.
 make all values in a column uppercase = str_to_upper(column_name).
 show me specific columns A, B, and C = select(column_A, column_B, column_C).
 
+## Feb. 3
+
+Finding all entries of a certain summarized column = view().
+  ex:
+
+```{r}
+maryland_ppp %>%
+  group_by(project_county_name) %>%
+  summarize(
+    counties = n()
+  )
+view(counties)
+
+```
+
+Changing a data type to <date> = ymd_hms() OR ymd().
+  year month date = yms.
+  hour minute second = hms.
+  If there's no time, it's just yms().
+  ex:
+  
+```{r}
+lubridate_maryland_ppp <- maryland_ppp_sample %>% mutate(
+  CleanDate = ymd_hms(date_approved)
+)
+glimpse(lubridate_maryland_ppp)
+
+```
 
