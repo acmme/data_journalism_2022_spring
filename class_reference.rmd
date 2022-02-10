@@ -88,3 +88,14 @@ glimpse(lubridate_maryland_ppp)
 
 ```
 
+## Feb. 8
+
+Run the following codeblock to change the data type of the "id" field from a number (dbl) to a character, and then glimpse the data, to see the change. Add a description of what this code does to your reference notebook.     
+
+```{r}
+ppp_maryland_loans <- ppp_maryland_loans %>%
+  mutate(id = as.character(id))
+
+glimpse(ppp_maryland_loans)
+```
+
