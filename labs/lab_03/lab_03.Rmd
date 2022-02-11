@@ -112,7 +112,7 @@ Some hints to help you answer this question:
 * When you examine the disclosure forms, there may be lots of stock sales and retirement accounts mixed in.  Ignore those. In the table in the disclosure forms, look for "Partnership" or "C-Corp" in the column named "Income Type"
 * This is a link to details on passage of the [CARES ACT](https://www.congress.gov/bill/116th-congress/house-bill/748). You can find a link to how the House voted by clicking on a link from [this page](https://www.congress.gov/bill/116th-congress/house-bill/748/actions).
 
-A3:
+A3: The business's names are: Dutch Miller of Charleston, Dutch Miller Chevrolet, Dutch Miller of Charlotte, Dutch Miller Subaru, and DM Motors. They are car dealerships. The businesses received $3,105,300 and $3,140,471 was forgiven. That's 101.1326% of the total loans forgiven. The U.S. House member voted yes to the CARES act that authorized the program.
 
 ```{r}
 
@@ -120,14 +120,11 @@ A3:
 # First, create a dataframe that only has loans to those five companies
 # Second, use that newly created dataframe to calculate total loan amount and percentage forgiven for those companies
 wv_ppp_loans %>% 
-  filter(str_detect(name, "DUTCH MILLER |DM MOTOR")) %>% 
+  filter(str_detect(name, "DUTCH MILLER |DM MOTOR")) %>%
   summarize(
-    total_loan_amount = sum(amount),
-    percentage_forgiven = forgiveness_amount / total_loan_amount * 100
-  ) %>% 
-  summarize(
-    total_total_loan_amount = sum(total_loan_amount),
-    total_percentage_forgiven = sum(percentage_forgiven)
+    total_amount = sum(amount),
+    total_forgiveness = sum(forgiveness_amount),
+    percent_forgiven = total_forgiveness/total_amount * 100
   )
   
 
