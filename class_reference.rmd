@@ -99,3 +99,13 @@ ppp_maryland_loans <- ppp_maryland_loans %>%
 glimpse(ppp_maryland_loans)
 ```
 
+## Feb. 15
+
+Sample template for basic filitering, mutate and group_by with count
+
+```{r}
+
+my_result <- original_data %>% 
+  filter(some_column)
+
+```
