@@ -182,7 +182,7 @@ maryland_ppp_with_naics_and_demographics %>%
 ```{r}
 # zcta with > 50% non-Hispanic white population grouped by rural/urban
 maryland_ppp_with_naics_and_demographics %>%
-  filter(PNHW > 50) %>%
+  filter(PNH > 50) %>%
   group_by(rural_urban_indicator) %>%
   summarize(
     count = n(),
