@@ -92,6 +92,8 @@ View(lender_types)
 ### Task 5: Cleaning up the data in R
 **Task** Run the following code to load and clean up the data
 
+This is where we would just explain our work.
+
 ```{r}
 lender_types <- read_csv("tabula-PPP_Report_Public_210531-508.csv", skip=1, col_names=c("type", "count", "approved", "net_dollars"))
 lender_types <- lender_types %>% mutate(net_dollars=as.numeric(parse_number(net_dollars)))
