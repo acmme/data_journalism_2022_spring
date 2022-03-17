@@ -62,6 +62,7 @@ Next join the two and then create a 5-character `zip5` column that we can use to
 maryland_ppp_with_naics <- maryland_ppp %>%
   left_join(naics_codes) %>% 
   mutate(zip5 = str_sub(zip, 1, 5))
+
 ```
 
 Let's add the Zip Code Tabulation Area dataset. You'll need to make the `ZCTA5N` column a character column, not a numeric one.
