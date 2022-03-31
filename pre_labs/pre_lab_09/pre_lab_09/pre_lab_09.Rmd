@@ -54,7 +54,7 @@ First, we'll create a dataframe of those top 10, called maryland_ppp_top_countie
 
 ```{r}
 maryland_ppp_top_counties <- ppp_maryland %>%
-  group_by(project_county_name) %>%
+  group_by(state) %>%
   summarise(
     total_loans = n()
   ) %>% 
