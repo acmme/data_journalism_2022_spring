@@ -75,7 +75,7 @@ county_vaccinations_by_date <- county_vaccinations_by_date %>%
 
 ### Task 4: Count the number of rows for each county
 **Task** Run the following code and describe the dataframe it produces. Is there anything unusual there?
-**Answer** The county totals are about the same (in the 400s) regardless of county population. There's also over 200 total vaccinations in an NA county.
+**Answer** There's also 200 total vaccinations in an NA county. Besides that NA county, there are 25 counties listed, but Maryland has only 24 (including Baltimore City).
 
 Let's see if there's anything unusual in the data by counting the number of rows for each county:
 
