@@ -52,7 +52,7 @@ crime_log <- read_csv("https://raw.githubusercontent.com/dwillis/wvu-projects/ma
 
 crime_log <- crime_log %>% 
   mutate(
-    date = mdy_hm(datetime, tz= "EST"),
+    date = mdy_hm(datetime),
     hour = hour(date)
   )
 
