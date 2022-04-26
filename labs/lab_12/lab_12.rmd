@@ -67,20 +67,21 @@ crime_log <- crime_log %>%
   )
 
 crime_log_recent_incidents <- crime_log %>% 
-  filter(date == today() - days(1))
+  arrange(desc(date)) %>% 
+  slice(1)
 
-vehicle_accidents_last_month <- crime_log %>% 
+incidents_last_month <- crime_log %>% 
   filter(between(date, today() - days(30), today())) %>% 
   group_by(title) %>% 
   summarize(
-    total_vehicular_accidents = n()
+    total_incidents = n()
   ) %>% 
-  filter(title == "VEHICLE ACCIDENT")
+  filter(title == crime_log_recent_incidents$title)
   
 
 
 
-sub <- paste("There were ", vehicle_accidents_last_month$total_vehicular_accidents, " ", str_to_lower(vehicle_accidents_last_month$title), "s in the last month, the most recent occurring on ", month(today(), label = TRUE, abbr = FALSE), " ", day(today() - days(1)), ", ", year(today()), ". Is this an increase or decrease from previous months?", sep="")
+sub <- paste("There were ", incidents_last_month$total_incidents, " ", str_to_lower(incidents_last_month$title), "s in the last month, the most recent occurring on ", month(today(), label = TRUE, abbr = FALSE), " ", day(crime_log_recent_incidents$date), ", ", year(today()), ". Is this an increase or decrease from previous months?", sep="")
 
 sub
 
@@ -155,7 +156,7 @@ write_csv(non_maryland_zips, nonmd_csv)
 sub <- paste("The two zip codes with the highest fully vaccinated population in Maryland are ", maryland_zips$zip[1], " and ", maryland_zips_vax$zip[2], ". The two zip codes with the highest fully vaccinated population outside of Maryland are ", non_maryland_zips_vax$zip[1], " and ", non_maryland_zips$zip[2], ".", sep="")
 sub
 
-# The top two zip codes of April 21, 2022, in Maryland reside in Montgomery County, and encompass Aspen Hill, Gaithersburg, North Potomac an Darnestown. The top two zip codes of the same date outside of Maryland are both in Washington, D.C.
+# The top two zip codes of April 21, 2022, in Maryland reside in Montgomery County, and encompass Aspen Hill, Gaithersburg, North Potomac and Darnestown. The top two zip codes of the same date outside of Maryland are both in Washington, D.C.
 
 ```
 
@@ -193,9 +194,11 @@ md_zip_vax_pop <- md_zip_vax_pop %>%
   ) %>% 
   filter(percent_fully_vaccinated < 50)
 
-covid <- read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
-head(covid)
-maryland <- covid %>% filter(state == "Maryland")
+# I used the COVID map from Nytimes because it looked a lot cleaner and more like the state of Maryland than the map from the census.
+
+map <- read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
+head(map)
+maryland <- map %>% filter(state == "Maryland")
 current <- maryland %>% summarize(max(date))
 marylandcurrent <- maryland %>% filter(date == current[[1]]) %>% rename(GEOID = fips)
 counties <- st_read("data/cb_2018_us_county_5m/cb_2018_us_county_5m.shp")
