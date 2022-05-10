@@ -18,8 +18,13 @@ The deliverable will be this R Markdown notebook and a data folder that you will
 **Task** Create a codeblock and load appropriate packages and settings for this assignment.
 
 ``` {r}
-
+options(scipen=999)
 library(tidyverse)
+library(tidycensus)
+library(janitor)
+library(sf)
+library(tigris)
+census_api_key("549950d36c22ff16455fe196bbbd01d63cfbe6cf")
 
 ```
 
@@ -27,27 +32,71 @@ library(tidyverse)
 
 **Q1.**. Write R code that generates some basic descriptive statistics that allows you to describe the applications from your state. This code should produce results that describe the data in different ways: how many applications there are, along with ways to understand the typical and most frequent values for columns you find interesting or newsworthy. You should produce at least five (5) descriptive statistics and write up a summary of the data using them.
 
-**A1.** 
+**A1.** There are 23,694 PPP applications recorded in Alaska, totaling $2,047,455,142 disbursed. All of the requested money was fully disbursed. Of the applications, 14.5% are white, 1.77% are Asian, and 1.74% are Native American. Less than 1% are Black, Hawaiian or Pacific Islander, or Eskimo & Aleut. 81.1% of people did not declare their race. Half of the applications are for businesses in rural areas, and half are for businesses in urban areas, approximately. 38% of applications are in the county of Anchorage, which holds Alaska's largest city.
 
 ``` {r}
-alaska_ppp <- read_csv("~/school/alaska_ppp/alaska_ppp.csv")
+
+# Reading the CSV and then cleaning up the data. To be clear, Alaska is not organized into counties. A majority of its land do not hold permanent settlements, and its zip codes and administrative districts do not cover the whole state. The federal government divides the areas not governed by administrative districts into census areas for census purposes. However, we'll continue to refer to these administrative districts and census areas as "counties."
+
+alaska_ppp_raw <- read_csv("~/school/alaska_ppp/alaska_ppp.csv")
+
+# The total amount of loans distributed per county. Alaska has 30 boroughs, city-boroughs and census areas. Two of the remaining counties are located in Texas and Guam. The last is "NA," and are derived from two applications that misspell their actual states -- AL and AR -- as AK. In total, these are only 4 errors in 23,694 applications, and so these can be disregarded.
+
+alaska_ppp <- alaska_ppp_raw %>% 
+  filter(congressional_district == "AK-")
+
+alaska_ppp$project_county_name <- str_to_upper(alaska_ppp$project_county_name)
+
+alaska_ppp <- alaska_ppp %>% 
+  mutate(
+    county = project_county_name,
+    zip_original = zip
+  ) %>% 
+  mutate(
+    zip = str_sub(zip_original, start=1L, end=5L)
+  ) %>% 
+  mutate(
+    zip = as.numeric(zip)
+  )
 
 # The number of applications recorded in Alaska.
 
 alaska_ppp %>% 
-  summarize(
-    number_of_applications = n()
-  )
+  count()
 
-# The total amount of loan money distributed, as recorded in Alaska.
+# The total amount of loan money distributed, as recorded in Alaska. Records show that 100% of the loan money requested was distributed in Alaska.
 
 alaska_ppp %>% 
   summarize(
-    total_amount_distributed = sum(current_approval_amount)
+    total_amount_disbursed = sum(amount),
+    total_amount_undisbursed = sum(undisbursed_amount)
   )
 
-# The total amount of loans distributed per county.
+# How loans were distributed by race or ethnic identity.
 
+alaska_ppp %>% 
+  count(race) %>% 
+  mutate(
+    percent = n / sum(n) * 100
+  ) %>% 
+  arrange(desc(n))
+
+# How loans were distributed between urban and rural areas.
+
+alaska_ppp %>% 
+  count(rural_urban_indicator) %>% 
+  mutate(
+    percent = n / sum(n) * 100
+  )
+
+# How loans were distributed by county.
+
+alaska_ppp %>% 
+  count(project_county_name) %>% 
+  mutate(
+    percent = n / sum(n) * 100
+  ) %>% 
+  arrange(desc(n))
 
 ```
 
@@ -56,13 +105,173 @@ alaska_ppp %>%
 
 **Q2.** Write R code that examines geographic patterns for PPP loans in your state, using Census population information to calculate a per-capita figure for the state and counties and zip codes. Then, make a county map using ggplot showing the per-capita data and a zip code map showing the difference from the statewide per-capita figure. Describe the most interesting or newsworthy findings based on your exploration.
 
-**A2.** 
+**A2.** Copper River Census Area has an extremely high rate of PPP loan money per capita, despite a low rae of PPP loan money per capita per zip code. Copper River is famous for the river of the same name, which hold salmon runs seasonally. So, despite the low population of people who actually live here -- less than 2,500 people -- the businesses here are prolific. The seasonal nature of these salmon runs and the general landscape of Alaska add to the fact that people haven't gathered into permanent settlements here.
+
+``` {r}
+
+#Calculating a per-capita figure for the state.
+
+ak_state_pop <- get_acs(geography = "state", 
+              variables = c(population = "B01001_001"), 
+              state = "AK",
+              year = 2020,
+              geometry = TRUE)
+
+ak_state_pop <- ak_state_pop %>%
+  rename(
+    state = NAME,
+    population = estimate
+  ) %>%
+  select(state, population)
+
+alaska_ppp_whole_state <- alaska_ppp %>% 
+  group_by(state) %>% 
+  summarize(
+    total_ppp_amount = sum(amount)
+  )
+
+alaska_ppp_per_capita_whole_state <- ak_state_pop %>% 
+  left_join(alaska_ppp_whole_state, by = c("state")) %>% 
+  drop_na(population)
+
+#Calculating a per-capita figure for counties.
+
+ak_county_pop <- get_acs(geography = "county", 
+              variables = c(population = "B01001_001"), 
+              state = "AK",
+              year = 2020,
+              geometry = TRUE)
+
+ak_county_pop <- ak_county_pop %>% 
+  rename(
+    county = NAME,
+    population = estimate
+  ) %>% 
+  select(county, population, geometry) %>% 
+  mutate(county = toupper(str_remove_all(county,", Alaska"))) %>%
+  mutate(county = str_remove_all(county, "BOROUGH|CENSUS AREA|CITY AND|MUNICIPALITY")) %>%
+  mutate(county = str_trim(county,side="both"))
+
+ak_county_pop$county <- gsub("-", " ", ak_county_pop$county)
+
+alaska_ppp_per_county <- alaska_ppp %>% 
+  group_by(county) %>% 
+  summarize(
+    total_ppp_amount = sum(amount)
+  )
+
+alaska_ppp_per_capita_per_county <- ak_county_pop %>% 
+  left_join(alaska_ppp_per_county, by = c("county")) %>% 
+  mutate(
+    ppp_amount_per_capita = total_ppp_amount / population
+  ) %>% 
+  drop_na(population)
+
+#Calculating a per-capita figure for zip codes.
+
+ak_zip_pop <- get_acs(geography = "zcta", 
+              variables = c(population = "B01001_001"), 
+              state = "AK",
+              year = 2019,
+              geometry = TRUE)
+
+ak_zip_pop <- ak_zip_pop %>% 
+  rename(
+    zip = GEOID,
+    population = estimate
+  ) %>% 
+  mutate(
+    zip = as.numeric(zip)
+  ) %>% 
+  select(zip, population)
+
+alaska_ppp_per_zip <- alaska_ppp %>% 
+  group_by(zip) %>% 
+  summarize(
+    total_ppp_amount = sum(amount)
+  )
+
+alaska_ppp_per_capita_per_zip <- ak_zip_pop %>% 
+  left_join(alaska_ppp_per_zip, by = c("zip")) %>% 
+  mutate(
+    ppp_amount_per_capita = total_ppp_amount / population
+  ) %>% 
+  drop_na(population)
+
+#Creating a county map.
+
+akcounties = counties("AK", cb = TRUE)
+
+ggplot(akcounties) + 
+  geom_sf(data = alaska_ppp_per_capita_per_county, aes(fill = ppp_amount_per_capita)) +
+  coord_sf(
+    crs = st_crs(3467), 
+    xlim = c(-2400000, 1600000), 
+    ylim = c(200000, 2500000), 
+    expand = FALSE, 
+    datum = NA
+    ) +
+  scale_fill_viridis_c(option = "turbo", trans = "sqrt") +
+  theme_void() +
+  labs(title = "PPP loans per capita per county")
+
+#Creating a zip code map.
+
+ggplot(akcounties) + 
+  geom_sf(data = ak_county_pop) +
+  coord_sf(
+    crs = st_crs(3467), 
+    xlim = c(-2400000, 1600000), 
+    ylim = c(200000, 2500000), 
+    expand = FALSE, 
+    datum = NA
+    ) +
+  geom_sf(data = ak_zip_pop, aes(fill = population)) +
+  coord_sf(
+    crs = st_crs(3467), 
+    xlim = c(-2400000, 1600000), 
+    ylim = c(200000, 2500000), 
+    expand = FALSE, 
+    datum = NA
+    ) +
+  scale_fill_viridis_c(option = "turbo", trans = "sqrt") +
+  theme_void() +
+  labs(title = "PPP loans per capita per zip code")
+
+
+```
 
 ## Lender Analysis
 
 **Q3.** Write R code to examine which lenders had the most approved applications in your state (and include summary statistics such as total amount and average loan amount). Generate dataframes that show the number and total amount of all loans and undisbursed loans per lender. For those lenders who had any undisbursed loans, make a graphic showing the relationship between the total amount of loans and the total undisbursed amount. Describe the most noticeable outlier lenders on that graphic below.
 
+If there are no undisbursed loans, make a graphic showing the relationship between lenders and loan amounts showing how many loans each lender issued for each amount in the dataframe. Describe the most noticeable outlier lenders on that graphic.
+
 **A3.** 
+
+```{r}
+
+#There are no undisbursed loans.
+
+lender_relationship <- alaska_ppp %>% 
+  group_by(lender) %>% 
+  summarize(
+    total_loans = n(),
+    total_amounts = sum(amount) / 1000000
+  ) %>% 
+  arrange(desc(total_loans))
+
+lender_relationship %>% 
+  ggplot(aes(x=total_loans, y=total_amounts)) + geom_point() +
+  labs(
+    title="Relationship between loan amounts and number of loans for each lender",
+    x = "number of loans",
+    y = "total amount of money disbursed, in millions of dollars",
+    caption = "source: SBA PPP loan database"
+    
+  )
+ 
+```
 
 
 ## Industry Analysis
@@ -74,6 +283,45 @@ Does the distribution of PPP applications by the top 10 industries (by number of
 Create a county-level map showing the differences between the PPP applications and the Census business data for one of the top 10 industry codes. You can do this either using ggplot or Datawrapper (if the latter, publish that map and include the URL below).
 
 **A4.** 
+
+```{r}
+
+naics <- read_csv("data/naics_code.txt") %>% 
+  rename(
+    fips_code = fipstate,
+    naics_code = naics
+  )
+
+#Statewide totals
+
+industry_patterns_statewide <- alaska_ppp %>% 
+  count(naics_code) %>% 
+  rename(
+    total = n
+  ) %>% 
+  mutate(
+    naics_code = as.character(naics_code),
+    fips_code = "02"
+  )
+
+industry_patterns_statewide <- naics %>% 
+  left_join(industry_patterns_statewide, by = c("fips_code", "naics_code")) %>%
+  drop_na(total) %>% 
+  arrange(desc(total)) %>% 
+  head(10)
+
+#County totals
+
+industry_patterns_per_county <- alaska_ppp %>% 
+  count(naics_code) %>% 
+  rename(
+    total = n
+  )
+
+
+
+
+```
 
 ## Summary
 
