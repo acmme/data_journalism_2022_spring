@@ -247,7 +247,7 @@ ggplot(akcounties) +
 
 If there are no undisbursed loans, make a graphic showing the relationship between lenders and loan amounts showing how many loans each lender issued for each amount in the dataframe. Describe the most noticeable outlier lenders on that graphic.
 
-**A3.** 
+**A3.** The most notable outliers in this graphic are Northrim Bank and First National Bank Alaska, which have allocated thousands of loans, compared to lenders that have only allocated handfuls of loans. These two banks are also the only banks to have allocated a total of more than half a billion dollars.
 
 ```{r}
 
@@ -257,12 +257,12 @@ lender_relationship <- alaska_ppp %>%
   group_by(lender) %>% 
   summarize(
     total_loans = n(),
-    total_amounts = sum(amount) / 1000000
+    amounts_in_millions = sum(amount) / 1000000
   ) %>% 
   arrange(desc(total_loans))
 
 lender_relationship %>% 
-  ggplot(aes(x=total_loans, y=total_amounts)) + geom_point() +
+  ggplot(aes(x=total_loans, y=amounts_in_millions)) + geom_point() +
   labs(
     title="Relationship between loan amounts and number of loans for each lender",
     x = "number of loans",
@@ -282,7 +282,9 @@ Does the distribution of PPP applications by the top 10 industries (by number of
 
 Create a county-level map showing the differences between the PPP applications and the Census business data for one of the top 10 industry codes. You can do this either using ggplot or Datawrapper (if the latter, publish that map and include the URL below).
 
-**A4.** 
+**A4.** The distribution of PPP applications by the top 10 industries do not match the number of businesses reported in the Census data. This is either an indication that businesses are underreported to the Census, or the PPP loan data is faulty. The numbers do match better when not including self-employed individuals and sole proprietorships, indicating that the PPP loan data includes many people that either are not really self-employed, or people that the Census has missed. The latter is probable due to how many parts of Alaska are remote and suffer from undercounting by the Census. There could be a story in how many people have asked for PPP loans in the fishing industry, especially those that consider themselves self-employed or sole proprietors.
+
+What's also strange is that a significant amount of PPP loans for the fishing industry are significantly along the coastline, but not at all in the county that includes Copper River, which, as established, has the highest amount of loans per capita. This would indicate that the loans in Copper River aren't loans for the fishing industry.
 
 ```{r}
 
@@ -290,34 +292,105 @@ naics <- read_csv("data/naics_code.txt") %>%
   rename(
     fips_code = fipstate,
     naics_code = naics
-  )
+  ) %>% 
+  filter(fips_code == "02")
 
 #Statewide totals
 
 industry_patterns_statewide <- alaska_ppp %>% 
   count(naics_code) %>% 
-  rename(
-    total = n
-  ) %>% 
   mutate(
-    naics_code = as.character(naics_code),
-    fips_code = "02"
-  )
-
-industry_patterns_statewide <- naics %>% 
-  left_join(industry_patterns_statewide, by = c("fips_code", "naics_code")) %>%
-  drop_na(total) %>% 
-  arrange(desc(total)) %>% 
+    naics_code = as.character(naics_code)
+  ) %>% 
+  arrange(desc(n)) %>% 
   head(10)
 
-#County totals
-
-industry_patterns_per_county <- alaska_ppp %>% 
-  count(naics_code) %>% 
-  rename(
-    total = n
+naics_statewide <- naics %>% 
+  group_by(naics_code) %>% 
+  summarize(
+    total = sum(est)
   )
 
+industry_patterns_statewide <- industry_patterns_statewide %>% 
+  left_join(naics_statewide, by = c("naics_code"))
+
+industry_patterns_statewide <- industry_patterns_statewide %>% 
+  mutate(
+    difference = abs(n - total)
+  )
+
+#Statewide totals without self-employed individuals and sole proprietorships x
+
+industry_patterns_statewide_not_alone <- alaska_ppp %>% 
+  filter(business_type != "Sole Proprietorship") %>% 
+  filter(business_type != "Self-Employed Individuals") %>% 
+  count(naics_code) %>% 
+  mutate(
+    naics_code = as.character(naics_code)
+  ) %>% 
+  arrange(desc(n)) %>% 
+  head(10)
+
+
+industry_patterns_statewide_not_alone <- industry_patterns_statewide_not_alone %>% 
+  left_join(naics_statewide, by = c("naics_code"))
+
+industry_patterns_statewide_not_alone <- industry_patterns_statewide_not_alone %>% 
+  mutate(
+    difference = abs(n - total)
+  )
+
+#County-level map
+
+naics_by_county <- naics %>% 
+  filter(naics_code == "114111")
+
+akcounties_naics <- akcounties %>% 
+  rename(fipscty = COUNTYFP) %>% 
+  left_join(naics_by_county, by = c("fipscty"))
+
+akcounties_naics <- akcounties_naics %>% 
+  select(NAME, est) %>% 
+  rename(county = NAME) %>% 
+  mutate(
+    county = str_to_upper(county)
+  )
+
+akcounties_naics$county <- gsub("-", " ", akcounties_naics$county)
+
+industry_patterns_by_county <- alaska_ppp %>% 
+  mutate(
+    naics_code = as.character(naics_code)
+  ) %>% 
+  filter(naics_code == "114111") %>% 
+  count(project_county_name) %>% 
+  rename(county = project_county_name)
+
+industry_patterns_by_county <- industry_patterns_by_county %>% 
+  left_join(akcounties_naics, by = c("county"))
+
+industry_patterns_by_county <- industry_patterns_by_county %>% 
+  mutate(est = ifelse(is.na(est), 0, est)) %>% 
+  mutate(
+    difference = n - est
+  ) %>% 
+  relocate(difference, .before = geometry)
+
+akcounties_naics <- akcounties_naics %>% 
+  left_join(industry_patterns_by_county)
+
+ggplot(akcounties_naics) +
+  geom_sf(data = akcounties_naics, aes(fill = difference)) +
+  coord_sf(
+    crs = st_crs(3467), 
+    xlim = c(-2400000, 1600000), 
+    ylim = c(200000, 2500000), 
+    expand = FALSE, 
+    datum = NA
+    ) +
+  scale_fill_viridis_c(trans = "sqrt") +
+  theme_void() +
+  labs(title = "Differences between the PPP applications and the Census business data")
 
 
 
@@ -328,3 +401,5 @@ industry_patterns_per_county <- alaska_ppp %>%
 **Q5.** What is the most promising story idea that you have found during this exploration? How would you approach reporting it out and what other information/data would you need to do that? What would be the minimum story you could get from this, and what would be the maximum story?
 
 **A5.**
+
+At minimum, there is a promising story on the Copper River fishing industry, and how significant it is in Alaska. With more reporting, we could understand how this seasonal fishing industry maintains itself, how it hires employees, and how those employees make a living. At maximum, there is a story about how Alaska distributes its resources in such an unregulated state. Census areas receive significantly less PPP loans per capita than boroughs, especially those in the middle of the state. With more information, we could see whether this is the case of fewer businesses per capita overall in those regions, or a case of businesses in those regions not being aware that they qualify for PPP loans. 
